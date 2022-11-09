@@ -168,7 +168,7 @@ RUN cp /var/www/MISP/app/Config/bootstrap.default.php /var/www/MISP/app/Config/b
     cp /var/www/MISP/app/Config/config.default.php /var/www/MISP/app/Config/config.php && \
     cp /var/www/MISP/app/Config/database.default.php /var/www/MISP/app/Config/database.php
 
-# EGYDE
+
 RUN chown -R www-data.www-data /var/www/MISP
 RUN chmod -R g+ws /var/www/MISP/app/tmp
 
