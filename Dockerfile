@@ -17,11 +17,11 @@ RUN apt-get update; apt-get install -y --no-install-recommends \
     librdkafka-dev \
     git \
     && apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
-        
+
  RUN pecl channel-update pecl.php.net
  RUN cp "/usr/lib/$(gcc -dumpmachine)"/libfuzzy.* /usr/lib; pecl install ssdeep && pecl install rdkafka
  RUN git clone --recursive --depth=1 https://github.com/kjdev/php-ext-brotli.git && cd php-ext-brotli && phpize && ./configure && make && make install
-        
+
 
 FROM debian:bullseye-slim as python-build
 RUN apt-get update; apt-get install -y --no-install-recommends \
@@ -140,13 +140,36 @@ COPY --from=php-build /usr/lib/php/${PHP_VER}/ssdeep.so /usr/lib/php/${PHP_VER}/
 COPY --from=php-build /usr/lib/php/${PHP_VER}/rdkafka.so /usr/lib/php/${PHP_VER}/rdkafka.so
 COPY --from=php-build /usr/lib/php/${PHP_VER}/brotli.so /usr/lib/php/${PHP_VER}/brotli.so
 
-RUN mkdir -p /opt/MISP/libs
-COPY --from=composer-build /tmp/Vendor /opt/MISP/libs/Vendor
-COPY --from=composer-build /tmp/Plugin /opt/MISP/libs/Plugin
-    
+RUN mkdir -p /tmp/MISP
+COPY --from=composer-build /tmp/Vendor /tmp/MISP/Vendor
+COPY --from=composer-build /tmp/Plugin /tmp/MISP/Plugin
+
 RUN for dir in /etc/php/*; do echo "extension=rdkafka.so" > "$dir/mods-available/rdkafka.ini"; done; phpenmod rdkafka
 RUN for dir in /etc/php/*; do echo "extension=brotli.so" > "$dir/mods-available/brotli.ini"; done; phpenmod brotli
 
 RUN for dir in /etc/php/*; do echo "extension=ssdeep.so" > "$dir/mods-available/ssdeep.ini"; done \
     ;phpenmod redis \
     ;phpenmod ssdeep
+
+# MISP code
+    # Download MISP using git in the /var/www/ directory.
+RUN git clone --branch ${MISP_TAG} --depth 1 https://github.com/MISP/MISP.git /var/www/MISP; \
+    # We build the MISP modules outside, so we don't need to grab those submodules
+    cd /var/www/MISP/app || exit; git -c submodule."misp-vagrant".update=none submodule update --init --recursive .; \
+    rm -rf /var/www/MISP/vagrant && \
+    rm -rf /var/www/MISP/debian && \
+    rm -rf /var/www/MISP/INSTALL
+
+COPY --from=composer-build /tmp/Vendor /var/www/MISP/app/Vendor
+COPY --from=composer-build /tmp/Plugin /var/www/MISP/app/Plugin
+
+RUN cp /var/www/MISP/app/Config/bootstrap.default.php /var/www/MISP/app/Config/bootstrap.php && \
+    cp /var/www/MISP/app/Config/core.default.php /var/www/MISP/app/Config/core.php && \
+    cp /var/www/MISP/app/Config/config.default.php /var/www/MISP/app/Config/config.php && \
+    cp /var/www/MISP/app/Config/database.default.php /var/www/MISP/app/Config/database.php
+
+# EGYDE
+RUN chown -R www-data.www-data /var/www/MISP
+RUN chmod -R g+ws /var/www/MISP/app/tmp
+
+WORKDIR /var/www/MISP
