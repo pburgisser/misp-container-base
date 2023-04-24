@@ -40,5 +40,5 @@ jobs:
             ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            MISP_TAG=v2.4.167
+            MISP_TAG=v2.4.170
             PHP_VER=20190902
